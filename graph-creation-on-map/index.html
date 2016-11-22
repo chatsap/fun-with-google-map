@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Marker animations with <code>setTimeout()</code></title>
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #floating-panel {
+        position: absolute;
+        top: 10px;
+        left: 25%;
+        z-index: 5;
+        background-color: #fff;
+        padding: 5px;
+        border: 1px solid #999;
+        text-align: center;
+        font-family: 'Roboto','sans-serif';
+        line-height: 30px;
+        padding-left: 10px;
+      }
+      #floating-panel {
+        margin-left: -52px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="floating-panel">
+      <button id="drop" onclick="drop()">Load Clues</button>
+    </div>
+    <div id="map"></div>
+    <script>
+
+      // If you're adding a number of markers, you may want to drop them on the map
+      // consecutively rather than all at once. This example shows how to use
+      // window.setTimeout() to space your markers' animation.
+
+      var neighborhoods = [
+      	{lat: 12.962643, lng: 77.635035},
+		{lat: 12.961432, lng: 77.638608},
+		{lat: 12.963840, lng: 77.638556},
+		{lat: 12.958524, lng: 77.638310},
+		{lat: 12.958524, lng: 77.638310},
+		{lat: 12.959148, lng: 77.637008},
+		{lat: 12.960139, lng: 77.638692},
+		{lat: 12.953756, lng: 77.639443},
+		{lat: 12.958524, lng: 77.638310},
+		{lat: 12.958524, lng: 77.638310}
+
+        /*{lat: 12.958524, lng: 77.638310},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.977215, lng: 77.591337},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.974887, lng: 77.593333},
+        {lat: 12.958524, lng: 77.638310},
+        {lat: 12.958524, lng: 77.638310}*/
+       ];
+
+      var markers = [];
+      var map;
+      var DEFAULT_RADIUS = 500 // in meters
+
+      // Define a symbol using SVG path notation, with an opacity of 1.
+		var dottedLineSymbol = {
+		  path: 'M 0,-1 0,1',
+		  strokeOpacity: 1,
+		  scale: 2
+		};
+
+		var solidLineSymbol = {
+		  path: 'M 0,-1 0,1',
+		  strokeOpacity: 1,
+		  scale: 4
+		};
+
+		// Create the polyline, passing the symbol in the 'icons' property.
+		// Give the line an opacity of 0.
+		// Repeat the symbol at intervals of 20 pixels to create the dashed effect.
+		
+		var geoFence = null;
+		function showGeoFence(map, position){
+			if(geoFence){
+				geoFence.setMap(null);
+				geoFence = null;
+			}
+
+			geoFence = new google.maps.Circle({
+	            strokeColor: '#FF0000',
+	            strokeOpacity: 10,
+	            strokeWeight: 2,
+	            fillColor: '#FF0000',
+	            fillOpacity: 0.15,
+	            map: map,
+	            center: {lat: position.lat(), lng: position.lng()},
+	            radius: DEFAULT_RADIUS
+	          });
+		}
+
+      function initMap() {
+      	var defaultCenter = {lat: 12.958524, lng: 77.638310}
+        map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 16,
+          center: defaultCenter
+        });
+        
+      }
+
+      
+
+      var dottedLinesFromCurrentNode = [];
+      var thRoute = [];
+      //var path = [];
+
+      function getClueGroupPosition(clueGroup){
+      	return {lat: parseFloat(clueGroup.answer.answerGeoLocation.latitude), lng: parseFloat(clueGroup.answer.answerGeoLocation.longitude)} ;
+      }
+
+      function addNodeToTHRoute(clueGroup){
+
+      	if(isClueGroupAddedInRoute(clueGroup)){
+      		alert("ClueGroup is already part of route.")
+      	}else{
+      		if(thRoute.length>0){
+	      		var lastNode = thRoute[thRoute.length-1];
+	      	  	drawSolidConnector(getClueGroupPosition(lastNode),getClueGroupPosition(clueGroup));
+		    
+	      	}
+	      	
+	      	thRoute.push(clueGroup);
+      	}
+
+      }
+
+      function isClueGroupAddedInRoute(neighbourClueGroup){
+      	var isClueGroupAddedInRoute = false;
+      	for (var i = 0; i <thRoute.length; i++) {
+      		if(neighbourClueGroup.activityGroupID == thRoute[i].activityGroupID){
+				isClueGroupAddedInRoute = true;
+				break;
+      		}
+      	}
+
+      	return isClueGroupAddedInRoute;
+
+      }
+
+      function drawSolidConnector(startPos, endPos){
+      	console.log(">> Drawing solid connector, startPos=["+JSON.stringify(startPos)+"], endPos=["+JSON.stringify(endPos)+"]")
+      		var solidLine = new google.maps.Polyline({
+			  path: [startPos, endPos],
+			  //strokeOpacity: 0,
+			  icons: [{
+			    icon: solidLineSymbol,
+			    offset: '0',
+			    //repeat: '20px'
+			  }],
+			  map: map
+			});
+      }
+
+      function drawDottedConnector(startPos, endPos){
+      	
+      	var dottedLine = new google.maps.Polyline({
+			  path: [startPos, endPos],
+			  strokeOpacity: 0,
+			  icons: [{
+			    icon: dottedLineSymbol,
+			    offset: '0',
+			    repeat: '20px'
+			  }],
+			  map: map
+			});
+			dottedLinesFromCurrentNode.push(dottedLine);
+      }
+
+      function  onMarkerClick (map, marker){
+      	console.log("Selected marker=" + JSON.stringify(marker.clueGroup));
+      	showGeoFence(map, marker.position)
+      	clearDottedLines();
+      	
+      	var nearestClueGroups = getNearestAvailavleClues(marker);
+      	for (var i = 0; i < nearestClueGroups.length; i++) {
+      		var nearestClueGroup = nearestClueGroups[i];
+			var neighbourPosition = {lat: parseFloat(nearestClueGroup.answer.answerGeoLocation.latitude), lng: parseFloat(nearestClueGroup.answer.answerGeoLocation.longitude)};
+			drawDottedConnector(marker.position, neighbourPosition);
+      	}
+      	if(confirm("Add this node to route?")){
+      		console.log("add node to route");
+      		addNodeToTHRoute(marker.clueGroup);
+      	}else{
+      		console.log("Do not add to route")
+      	}
+      }
+
+      function getNearestAvailavleClues(marker){
+      	var nearestNeighbours = [];
+      	for (var i = 0; i <clueGroups.length; i++) {
+      		var neighbourClueGroup = clueGroups[i].clueGroup;
+      		var neighbourPosition = {lat: parseFloat(neighbourClueGroup.answer.answerGeoLocation.latitude), lng: parseFloat(neighbourClueGroup.answer.answerGeoLocation.longitude)};
+      		var distance = getHaversineDistance(marker.position,neighbourPosition);
+      		console.log("distance="+distance);
+      		if(!isClueGroupAddedInRoute(neighbourClueGroup) && distance<=DEFAULT_RADIUS){
+      			nearestNeighbours.push(neighbourClueGroup)
+      		}
+      	}
+      	console.log(nearestNeighbours);
+      	return nearestNeighbours;
+
+      }
+
+      
+
+	function getHaversineDistance(origin, destination){
+        var lat1 = origin.lat();
+        var long1 = origin.lng();
+        var lat2 = destination.lat;
+        var long2 = destination.lng;
+        var a, c, d;
+        var toRad =  function (x) {
+            return x * Math.PI / 180;
+        };
+        var R = 6371000; // metres
+        var p = toRad(lat1);
+        var q = toRad(lat2);
+        var r = toRad((lat2 - lat1)); //difference in lat
+        var s = toRad((long2 - long1)); //difference in long
+
+        a = Math.sin(r / 2) * Math.sin(r / 2) + Math.cos(p) * Math.cos(q) * Math.sin(s / 2) * Math.sin(s / 2);
+        c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        d = R * c;
+        
+        return d;
+    }
+
+		function drop() {
+	        clearMarkers();
+	        for (var i = 0; i < clueGroups.length; i++) {
+	          addMarkerWithTimeout(clueGroups[i].clueGroup, i * 200);
+	        }
+	      }
+
+      function addMarkerWithTimeout(clueGroup, timeout) {
+
+        window.setTimeout(function() {
+        	var marker = new google.maps.Marker({
+	            position: {lat: parseFloat(clueGroup.answer.answerGeoLocation.latitude), lng: parseFloat(clueGroup.answer.answerGeoLocation.longitude)},
+	            map: map,
+	            animation: google.maps.Animation.DROP,
+	            clueGroup: clueGroup
+	          })
+          
+
+			marker.addListener('click', function() {
+				//infowindow.open(map, marker);
+				onMarkerClick(map, marker);
+			});
+
+			markers.push();
+
+
+        }, timeout);
+      }
+
+      function clearMarkers() {
+        for (var i = 0; i < markers.length; i++) {
+          markers[i].setMap(null);
+        }
+        markers = [];
+      }
+      function clearDottedLines(){
+      	for (var i = 0; i < dottedLinesFromCurrentNode.length; i++) {
+          dottedLinesFromCurrentNode[i].setMap(null);
+        }
+        dottedLinesFromCurrentNode = [];
+      }
+
+
+
+
+
+
+
+
+
+
+      var clueGroups =  [
+      {
+        "sequenceNumber": 1,
+        "clueGroup": {
+          "activityGroupID": 433,
+          "groupDescription": "Chokanatha Temple",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 10,
+              "successMessage": "Chokkanathaswamy Temple is the oldest temple in Bengaluru and has Lord Vishnu as the presiding deity. It was built by the Cholas during 10th century C.E as suggested by some grantham scripts in the temple. In one of the Tamil inscriptions Domlur is referred to as Tombalur. It was renovated around 20 years ago and the only original structures in it now are the sanctum sanctorum and two ardhamandapas.  ",
+              "failureMessage": "Chokkanathaswamy Temple is the oldest temple in Bengaluru and has Lord Vishnu as the presiding deity. It was built by the Cholas during 10th century C.E as suggested by some grantham scripts in the temple. In one of the Tamil inscriptions Domlur is referred to as Tombalur. It was renovated around 20 years ago and the only original structures in it now are the sanctum sanctorum and two ardhamandapas.  ",
+              "activityDetails": {
+                "activityId": 639,
+                "actDescription": "Namma Dommaluru has the oldest temple in Bengaluru. Find this temple and geo check in.",
+                "answerType": "GPS"
+              }
+            },
+            {
+              "sequenceNumber": 2,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 7,
+              "successMessage": "Chokkanathaswamy Temple is the oldest temple in Bengaluru and has Lord Vishnu as the presiding deity. It was built by the Cholas during 10th century C.E as suggested by some grantham scripts in the temple. In one of the Tamil inscriptions Domlur is referred to as Tombalur. It was renovated around 20 years ago and the only original structures in it now are the sanctum sanctorum and two ardhamandapas.  ",
+              "failureMessage": "Chokkanathaswamy Temple is the oldest temple in Bengaluru and has Lord Vishnu as the presiding deity. It was built by the Cholas during 10th century C.E as suggested by some grantham scripts in the temple. In one of the Tamil inscriptions Domlur is referred to as Tombalur. It was renovated around 20 years ago and the only original structures in it now are the sanctum sanctorum and two ardhamandapas.  ",
+              "activityDetails": {
+                "activityId": 640,
+                "actDescription": " A living evidence of the Chola dynasty's presence in 10th century. ",
+                "answerType": "GPS"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 226,
+            "answerText": "ChockNathaSwamy Temple",
+            "answerGeoLocation": {
+              "geoId": 125,
+              "latitude": "12.962643",
+              "longitude": "77.635035",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 2,
+        "clueGroup": {
+          "activityGroupID": 281,
+          "groupDescription": "Domlur Bus depot Jigsaw",
+          "proxmityDisp": "Y",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": 45,
+              "points": 10,
+              "successMessage": "Domlur Bus depot.",
+              "failureMessage": "Ah! Its the Domlur Bus Depot",
+              "activityDetails": {
+                "activityId": 389,
+                "actDescription": "201 is queued up here in this building. <BR/><BR/>Shani sits besides this building and Service tax commisioner is always on top of this.<BR/><BR/>Find this building and solve the Jigsaw",
+                "actImageURL": "http://static.sparrowzapp.com/images/Bengaluru/Domlur/DomlurBusStand.jpg",
+                "answerType": "JGS"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 135,
+            "answerText": "Domlur Bus Depot",
+            "answerGeoLocation": {
+              "geoId": 73,
+              "latitude": "12.961432",
+              "longitude": "77.638608",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 3,
+        "clueGroup": {
+          "activityGroupID": 434,
+          "groupDescription": "Lavonne MCQ",
+          "proxmityDisp": "Y",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 10,
+              "successMessage": "Lavonne is an Academy of Baking Science and Pastry Arts that also runs a café and patisserie. A must visit for pastry lovers to spend some peaceful time in this cosy corner. ",
+              "failureMessage": "Lavonne is an Academy of Baking Science and Pastry Arts that also runs a café and patisserie. A must visit for pastry lovers to spend some peaceful time in this cosy corner. ",
+              "activityDetails": {
+                "activityId": 641,
+                "actDescription": "Where can you do a Diplôme de Pâtisserie from? ",
+                "answerType": "MCQ"
+              }
+            },
+            {
+              "sequenceNumber": 2,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 7,
+              "successMessage": "Lavonne is an Academy of Baking Science and Pastry Arts that also runs a café and patisserie. A must visit for pastry lovers to spend some peaceful time in this cosy corner. ",
+              "failureMessage": "Lavonne is an Academy of Baking Science and Pastry Arts that also runs a café and patisserie. A must visit for pastry lovers to spend some peaceful time in this cosy corner. ",
+              "activityDetails": {
+                "activityId": 642,
+                "actDescription": "Started as an Academy of Baking Science and Pastry Arts now also runs a café.",
+                "answerType": "MCQ"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 227,
+            "answerText": "Starbucks,National Public School,Lavonne,New Horizon|Lavonne",
+            "answerGeoLocation": {
+              "geoId": 126,
+              "latitude": "12.963840",
+              "longitude": "77.638556",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 4,
+        "clueGroup": {
+          "activityGroupID": 435,
+          "groupDescription": "Dommuluru Park Selfie",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 0,
+              "successMessage": "Domlur has many options of parks that one can explore- Domlur SAARC, Dommuluru park, BDA Park to name a few. ",
+              "failureMessage": "Domlur has many options of parks that one can explore- Domlur SAARC, Dommuluru park, BDA Park to name a few. ",
+              "activityDetails": {
+                "activityId": 643,
+                "actDescription": "30's run and 60's walk here. Click a selfie with the serenity of this place.",
+                "answerType": "SLF"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 1,
+            "answerText": "NA",
+            "answerGeoLocation": {
+              "geoId": 1,
+              "latitude": "12.958524",
+              "longitude": "77.638310",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 5,
+        "clueGroup": {
+          "activityGroupID": 436,
+          "groupDescription": "Statue QA",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 10,
+              "successMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days. ",
+              "failureMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days.",
+              "activityDetails": {
+                "activityId": 644,
+                "actDescription": "My fans fondly call me Annavru. I am in Dommaluru and Who am I?",
+                "answerType": "WRD"
+              }
+            },
+            {
+              "sequenceNumber": 2,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 7,
+              "successMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days. ",
+              "failureMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days.",
+              "activityDetails": {
+                "activityId": 645,
+                "actDescription": "I have acted in over 220 Kannada movies. ",
+                "actImageURL": "http://static.sparrowzapp.com/images/Bengaluru/Domlur/DomlurChallenge/rajakumar.jpg",
+                "answerType": "WRD"
+              }
+            },
+            {
+              "sequenceNumber": 3,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 5,
+              "successMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days. ",
+              "failureMessage": " Famously know by his screen name Rajkumar, Singanalluru Puttaswamayya Muthuraju's bust sculpture was installed at this junction on 28th October 2016. Leading as a Kannada actor for nearly 50 years Rajkumar acted in over 220 movies and was also a trained singer. The city also had a tense moment when Rajkumar was kidnapped by Veerappan and kept hostage for 108 days.",
+              "activityDetails": {
+                "activityId": 646,
+                "actDescription": "I was kidnapped by Veerappan in 2000.",
+                "answerType": "WRD"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 228,
+            "answerText": "Rajkumar,Raj Kumar,Rajkomar",
+            "answerGeoLocation": {
+              "geoId": 1,
+              "latitude": "12.959666",
+              "longitude": "77.639410",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 6,
+        "clueGroup": {
+          "activityGroupID": 59,
+          "groupDescription": "Gym",
+          "proxmityDisp": "Y",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 2,
+              "countDownTime": -1,
+              "points": 100,
+              "activityDetails": {
+                "activityId": 76,
+                "actDescription": "A kids park in the vicinity of Sri Manjunatha Temple which adults can also gym alongside. Find this park and Click a selfie of you working out.",
+                "answerType": "SLF"
+              }
+            },
+            {
+              "sequenceNumber": 2,
+              "noOfRetriesAllowed": 2,
+              "countDownTime": -1,
+              "points": 50,
+              "activityDetails": {
+                "activityId": 77,
+                "actDescription": "Get your clue from this photo.",
+                "actImageURL": "http://static.sparrowzapp.com/images/Bengaluru/Domlur/Gym.jpg",
+                "answerType": "SLF"
+              }
+            },
+            {
+              "sequenceNumber": 3,
+              "noOfRetriesAllowed": 2,
+              "countDownTime": -1,
+              "points": 25,
+              "activityDetails": {
+                "activityId": 78,
+                "actDescription": "<a href=\"https://goo.gl/maps/zRXDu5k3VVv\">Google Map Link</a>",
+                "answerType": "SLF"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 17,
+            "answerText": "Gym",
+            "answerGeoLocation": {
+              "geoId": 5,
+              "latitude": "12.959148",
+              "longitude": "77.637008",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 7,
+        "clueGroup": {
+          "activityGroupID": 280,
+          "groupDescription": "Bowring Kulfi Domlur MCQ",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 2,
+              "countDownTime": -1,
+              "points": 10,
+              "successMessage": "Fab!Grab one",
+              "failureMessage": "Ah!! Costs Rs.30 here in domlur.",
+              "activityDetails": {
+                "activityId": 388,
+                "actDescription": "Goli Vadapav in domlur also stocks the bangalore famous Bowring Kulfi.<BR/><BR/>How much does a Kesar Kulfi costs.?",
+                "answerType": "MCQ"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 130,
+            "answerText": "Rs.20,Rs.25,Rs.30,Rs.35|Rs.30",
+            "answerGeoLocation": {
+              "geoId": 70,
+              "latitude": "12.960139",
+              "longitude": "77.638692",
+              "fenceRadius": 30
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 8,
+        "clueGroup": {
+          "activityGroupID": 438,
+          "groupDescription": "Murphy GPS",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 10,
+              "successMessage": "Located on the fourth level of The Paul Hotel, Murphy's Brewhouse is the first Irish Brewhouse in Bangalore serving different craft beers. Pizzas are a hot favourite at Murphys. ",
+              "failureMessage": "Located on the fourth level of The Paul Hotel, Murphy's Brewhouse is the first Irish Brewhouse in Bangalore serving different craft beers. Pizzas are a hot favourite at Murphys. ",
+              "activityDetails": {
+                "activityId": 648,
+                "actDescription": "Bangalore's first Irish brewery located in Domlur's calm residential area. Check In from Murphy's. ",
+                "answerType": "GPS"
+              }
+            },
+            {
+              "sequenceNumber": 2,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 7,
+              "successMessage": "Located on the fourth level of The Paul Hotel, Murphy's Brewhouse is the first Irish Brewhouse in Bangalore serving different craft beers. Pizzas are a hot favourite at Murphys. ",
+              "failureMessage": "Located on the fourth level of The Paul Hotel, Murphy's Brewhouse is the first Irish Brewhouse in Bangalore serving different craft beers. Pizzas are a hot favourite at Murphys. ",
+              "activityDetails": {
+                "activityId": 649,
+                "actDescription": "This is their mascot",
+                "actImageURL": "http://static.sparrowzapp.com/images/Bengaluru/Domlur/DomlurChallenge/Murphys_mascot.png",
+                "answerType": "GPS"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 229,
+            "answerText": "Murphy GPS",
+            "answerGeoLocation": {
+              "geoId": 127,
+              "latitude": "12.953756",
+              "longitude": "77.639443",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 9,
+        "clueGroup": {
+          "activityGroupID": 283,
+          "groupDescription": "Domlur Info",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 2,
+              "countDownTime": -1,
+              "points": 0,
+              "activityDetails": {
+                "activityId": 391,
+                "actDescription": "Domlur, located in the east of Bangalore city was included in the erstwhile Bangalore Civil and Military Station under the British Madras presidency. This was until it was transferred to the Mysore State in 1949. <BR/><BR/>There are different theories that surround the name of this township. Tamil Grantha inscriptions in a temple at Domlur dating back to the 10th century refer to a place called Tombalur. Many believe this is where the name comes from. <BR/><BR/>Some are of the opinion that the area had a lot of mosquitoes. In Telugu mosquitoes are called Domalu. Hence, Domalu(mosquitoes) and Ooru(village), making it Domulur. ",
+                "actImageURL": "http://static.sparrowzapp.com/images/Bengaluru/Domlur/Domluru.jpg",
+                "answerType": "INF"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 1,
+            "answerText": "NA",
+            "answerGeoLocation": {
+              "geoId": 1,
+              "latitude": "12.957524",
+              "longitude": "77.637310",
+              "fenceRadius": 50
+            }
+          }
+        }
+      },
+      {
+        "sequenceNumber": 10,
+        "clueGroup": {
+          "activityGroupID": 143,
+          "groupDescription": "Feedback with smiley",
+          "proxmityDisp": "N",
+          "activities": [
+            {
+              "sequenceNumber": 1,
+              "noOfRetriesAllowed": 3,
+              "countDownTime": -1,
+              "points": 0,
+              "activityDetails": {
+                "activityId": 198,
+                "actDescription": "How do you feel.?",
+                "answerType": "FBS"
+              }
+            }
+          ],
+          "answer": {
+            "answerId": 1,
+            "answerText": "NA",
+            "answerGeoLocation": {
+              "geoId": 1,
+              "latitude": "12.955524",
+              "longitude": "77.635310",
+              "fenceRadius": 50
+            }
+          }
+        }
+      }
+    ];
+
+    </script>
+    <script async defer
+    src="https://maps.googleapis.com/maps/api/js?callback=initMap">
+    </script>
+  </body>
+</html>
